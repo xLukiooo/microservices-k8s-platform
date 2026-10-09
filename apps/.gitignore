@@ -1,0 +1,18 @@
+# Sekrety i środowisko
+.env
+
+# Śmieci Pythona i cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Systemowe i edytory
+.DS_Store
+.vscode/
+.idea/
+*.swp

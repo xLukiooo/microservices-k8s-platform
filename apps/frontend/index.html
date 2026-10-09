@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud-Native Orders Platform</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+    .card { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; }
+    .table { color: #f8fafc; border-color: #334155; }
+    .badge-pending { background-color: #f59e0b; color: #000; }
+    .badge-processing { background-color: #3b82f6; color: #fff; }
+    .badge-completed { background-color: #10b981; color: #fff; }
+    .badge-failed { background-color: #ef4444; color: #fff; }
+    .form-control, .form-select { background-color: #0f172a; border-color: #334155; color: #f8fafc; }
+    .form-control:focus, .form-select:focus { background-color: #0f172a; border-color: #60a5fa; color: #fff; box-shadow: none; }
+  </style>
+</head>
+<body class="py-4">
+  <div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary">
+      <div>
+        <h2 class="fw-bold mb-1">Cloud-Native Orders Platform</h2>
+        <p class="text-secondary mb-0">Microservices Architecture: Frontend + API + Worker + Redis + PostgreSQL</p>
+      </div>
+      <div class="text-end">
+        <span class="badge bg-primary" id="system-status">Sprawdzanie stanu...</span>
+      </div>
+    </div>
+
+    <!-- Quick Metrics / Status Cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card p-3">
+          <small class="text-secondary text-uppercase fw-semibold">Kolejka Redis</small>
+          <div class="h3 fw-bold my-1" id="metric-queue">0</div>
+          <small class="text-muted">oczekujących zadań</small>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card p-3">
+          <small class="text-secondary text-uppercase fw-semibold">Wszystkie zamówienia</small>
+          <div class="h3 fw-bold my-1" id="metric-total">0</div>
+          <small class="text-muted">w bazie PostgreSQL</small>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card p-3">
+          <small class="text-secondary text-uppercase fw-semibold">Przetworzone</small>
+          <div class="h3 fw-bold my-1 text-success" id="metric-completed">0</div>
+          <small class="text-muted">przez Workery</small>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card p-3">
+          <small class="text-secondary text-uppercase fw-semibold">Test Autoskalera (HPA)</small>
+          <button class="btn btn-outline-warning btn-sm mt-2 w-100" onclick="triggerCpuBurn()">Obciąż CPU (3s)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Create Order Form -->
+      <div class="col-lg-4">
+        <div class="card p-4 h-100">
+          <h5 class="fw-bold mb-3">Złóż nowe zamówienie</h5>
+          <form id="order-form" onsubmit="handleCreateOrder(event)">
+            <div class="mb-3">
+              <label class="form-label text-secondary small">ID Klienta</label>
+              <input type="text" class="form-control" id="customerId" value="client_101" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary small">Nazwa produktu</label>
+              <input type="text" class="form-control" id="item" value="Kurs Kubernetes" required>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label text-secondary small">Ilość</label>
+                <input type="number" class="form-control" id="quantity" value="1" min="1" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label text-secondary small">Kwota ($)</label>
+                <input type="number" step="0.01" class="form-control" id="amount" value="149.99" min="0.01" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" id="btn-submit">
+              Wyślij do API
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Orders Live Table -->
+      <div class="col-lg-8">
+        <div class="card p-4 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">Zamówienia w czasie rzeczywistym</h5>
+            <small class="text-muted">Odświeżanie co 2s</small>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr class="text-secondary small">
+                  <th>ID</th>
+                  <th>Klient</th>
+                  <th>Produkt</th>
+                  <th>Kwota</th>
+                  <th>Status</th>
+                  <th>Worker Pod</th>
+                </tr>
+              </thead>
+              <tbody id="orders-table-body">
+                <tr>
+                  <td colspan="6" class="text-center text-muted py-4">Ładowanie danych...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = (window.location.port === '8080') ? 'http://localhost:8000/api/v1' : '/api/v1';
+
+    async function fetchStatsAndOrders() {
+      try {
+        // 1. Queue stats
+        const queueRes = await fetch(`${API_BASE}/queue/stats`);
+        if (queueRes.ok) {
+          const queueData = await queueRes.json();
+          document.getElementById('metric-queue').innerText = queueData.pending_jobs;
+          document.getElementById('system-status').className = 'badge bg-success';
+          document.getElementById('system-status').innerText = 'Online';
+        }
+
+        // 2. Orders list
+        const ordersRes = await fetch(`${API_BASE}/orders`);
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json();
+          renderOrders(ordersData.orders || []);
+        }
+      } catch (err) {
+        document.getElementById('system-status').className = 'badge bg-danger';
+        document.getElementById('system-status').innerText = 'Offline / Błąd połączenia';
+      }
+    }
+
+    function renderOrders(orders) {
+      const tbody = document.getElementById('orders-table-body');
+      document.getElementById('metric-total').innerText = orders.length;
+      
+      const completedCount = orders.filter(o => o.status === 'COMPLETED').length;
+      document.getElementById('metric-completed').innerText = completedCount;
+
+      if (orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Brak zamówień. Dodaj pierwsze zamówienie!</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = orders.map(o => {
+        let badgeClass = 'badge-pending';
+        if (o.status === 'PROCESSING') badgeClass = 'badge-processing';
+        else if (o.status === 'COMPLETED') badgeClass = 'badge-completed';
+        else if (o.status === 'FAILED') badgeClass = 'badge-failed';
+
+        return `
+          <tr>
+            <td><code class="text-info">${o.order_id ? o.order_id.substring(0, 8) : '...'}</code></td>
+            <td>${o.customer_id}</td>
+            <td>${o.item}</td>
+            <td>$${Number(o.amount).toFixed(2)}</td>
+            <td><span class="badge ${badgeClass}">${o.status}</span></td>
+            <td><small class="text-secondary">${o.worker_id || '-'}</small></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function handleCreateOrder(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.innerText = 'Wysyłanie...';
+
+      const payload = {
+        customer_id: document.getElementById('customerId').value,
+        item: document.getElementById('item').value,
+        quantity: parseInt(document.getElementById('quantity').value),
+        amount: parseFloat(document.getElementById('amount').value)
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          await fetchStatsAndOrders();
+        } else {
+          alert('Błąd podczas składania zamówienia: ' + res.statusText);
+        }
+      } catch (err) {
+        alert('Błąd połączenia z API: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Wyślij do API';
+      }
+    }
+
+    async function triggerCpuBurn() {
+      try {
+        await fetch(`${API_BASE}/cpu-burn?seconds=3`);
+        alert('Wysłano sygnał obciążenia CPU (3s). Sprawdź wskaźniki w HPA!');
+      } catch (err) {
+        alert('Błąd: ' + err.message);
+      }
+    }
+
+    // Polling co 2 sekundy
+    setInterval(fetchStatsAndOrders, 2000);
+    fetchStatsAndOrders();
+  </script>
+</body>
+</html>
+

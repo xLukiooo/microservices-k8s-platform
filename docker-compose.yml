@@ -1,0 +1,62 @@
+services:
+  frontend:
+    build: ./apps/frontend
+    ports:
+      - "8080:80"
+  order-worker:
+    build: ./apps/order-worker
+    ports:
+      - "9102:9102"
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: 0
+      QUEUE_NAME: orders_queue
+  
+  order-api:
+    build: ./apps/order-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: 0
+      QUEUE_NAME: orders_queue
+  redis:
+    image: redis:alpine3.22
+    ports:
+      - "6379:6379"
+  postgres:
+    image: postgres:16.15-alpine3.23
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+volumes:
+  postgres_data:
+
+    
+
+

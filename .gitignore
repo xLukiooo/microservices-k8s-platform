@@ -1,0 +1,21 @@
+# Sekrety i srodowisko lokalne
+.env
+
+# Lokalne notatki i instrukcje
+README.md
+
+# Python cache & venv
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Narzedzia i edytory
+.DS_Store
+.vscode/
+.idea/
+*.swp
