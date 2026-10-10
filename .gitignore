@@ -1,5 +1,6 @@
 # Sekrety i srodowisko lokalne
 .env
+deploy/k8s/base/secret.yaml
 
 # Lokalne notatki i instrukcje
 README.md

@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: order-platform
+
+resources:
+  # Fundamenty
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - ingress.yaml
+  - hpa.yaml
+
+  # Baza danych i Cache
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+  - postgres/serviceaccount.yaml
+  - postgres/networkpolicy.yaml
+
+  - redis/statefulset.yaml
+  - redis/service.yaml
+  - redis/serviceaccount.yaml
+  - redis/networkpolicy.yaml
+
+  # Mikroserwisy aplikacyjne
+  - order-api/deployment.yaml
+  - order-api/service.yaml
+  - order-api/serviceaccount.yaml
+  - order-api/networkpolicy.yaml
+
+  - order-worker/deployment.yaml
+  - order-worker/service.yaml
+  - order-worker/serviceaccount.yaml
+  - order-worker/networkpolicy.yaml
+
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - frontend/serviceaccount.yaml
+  - frontend/networkpolicy.yaml
+
