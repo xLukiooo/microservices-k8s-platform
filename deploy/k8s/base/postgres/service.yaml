@@ -8,10 +8,14 @@ metadata:
   namespace: order-platform
 spec:
   ports:
-  - name: 5432-5432
+  - name: postgres
     port: 5432
     protocol: TCP
     targetPort: 5432
+  - name: metrics
+    port: 9187
+    protocol: TCP
+    targetPort: 9187
   selector:
       app.kubernetes.io/name: postgres
       app.kubernetes.io/component: database

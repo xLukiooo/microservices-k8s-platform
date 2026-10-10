@@ -49,6 +49,30 @@ spec:
         volumeMounts:
         - name: postgres-data
           mountPath: /var/lib/postgresql/data
+      - image: prometheuscommunity/postgres-exporter:v0.20.1
+        name: postgres-exporter
+        ports:
+        - name: metrics
+          containerPort: 9187
+        env:
+        - name: DATA_SOURCE_URI
+          value: "localhost:5432/orders_db?sslmode=disable"
+        - name: DATA_SOURCE_USER
+          valueFrom:
+            secretKeyRef:
+              name: order-platform-secret
+              key: POSTGRES_USER
+        - name: DATA_SOURCE_PASS
+          valueFrom:
+            secretKeyRef:
+              name: order-platform-secret
+              key: POSTGRES_PASSWORD
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
   volumeClaimTemplates:
   - metadata:
       name: postgres-data

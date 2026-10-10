@@ -8,10 +8,14 @@ metadata:
   namespace: order-platform
 spec:
   ports:
-  - name: 6379-6379
+  - name: redis
     port: 6379
     protocol: TCP
     targetPort: 6379
+  - name: metrics
+    port: 9121
+    protocol: TCP
+    targetPort: 9121
   selector:
       app.kubernetes.io/name: redis
       app.kubernetes.io/component: database

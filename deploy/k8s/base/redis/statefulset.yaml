@@ -49,6 +49,25 @@ spec:
         volumeMounts:
         - name: redis-data
           mountPath: /data
+      - image: oliver006/redis_exporter:v1.93.0
+        name: redis-exporter
+        ports:
+        - name: metrics
+          containerPort: 9121
+        env:
+        - name: REDIS_ADDR
+          value: "redis://localhost:6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: order-platform-secret
+              key: REDIS_PASSWORD
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
   volumeClaimTemplates:
   - metadata:
       name: redis-data
